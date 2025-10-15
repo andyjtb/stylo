@@ -90,4 +90,13 @@ fn main() {
     println!("cargo:out_dir={}", env::var("OUT_DIR").unwrap());
     generate_properties(engine);
     build_gecko::generate();
+    
+    // Build cxx bridge for C++ FFI
+    cxx_build::bridge("ffi/mod.rs")
+        .file("ffi/css_parser_bridge.cpp")
+        .flag_if_supported("-std=c++14")
+        .compile("stylo_css_parser_ffi");
+    
+    println!("cargo:rerun-if-changed=ffi/mod.rs");
+    println!("cargo:rerun-if-changed=ffi/css_parser_bridge.cpp");
 }

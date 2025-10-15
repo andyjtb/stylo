@@ -20,18 +20,18 @@ doctest = false
 
 [features]
 default = ["servo"]
-gecko = [
-    "bindgen",
-    "malloc_size_of/gecko",
-    "mozbuild",
-    "nsstring",
-    "regex",
-    "serde",
-    "style_traits/gecko",
-    "toml",
-    "selectors/to_shmem",
-    "to_shmem/gecko",
-]
+#gecko = [
+#    "bindgen",
+#    "malloc_size_of/gecko",
+#    "mozbuild",
+#    "nsstring",
+#    "regex",
+#    "serde",
+#    "style_traits/gecko",
+#    "toml",
+#    "selectors/to_shmem",
+#    "to_shmem/gecko",
+#]
 servo = [
     "cssparser/serde",
     "encoding_rs",
@@ -102,6 +102,7 @@ thin-vec = "0.2.1"
 uluru = "3.0"
 void = "1.0.2"
 url = { version = "2.5", optional = true, features = ["serde"] }
+cxx = "1.0"
 
 [build-dependencies]
 lazy_static = "1"
@@ -111,3 +112,4 @@ regex = {version = "1.0", optional = true, default-features = false, features = 
 walkdir = "2.1.4"
 toml = {version = "0.5", optional = true, default-features = false}
 mozbuild = {version = "0.1", optional = true}
+cxx-build = "1.0"

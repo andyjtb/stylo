@@ -93,6 +93,7 @@ pub mod dom;
 pub mod dom_apis;
 pub mod driver;
 pub mod error_reporting;
+pub mod ffi;
 pub mod font_face;
 pub mod font_metrics;
 #[cfg(feature = "gecko")]
