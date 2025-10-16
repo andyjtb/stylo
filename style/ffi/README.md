@@ -137,14 +137,28 @@ The build.rs file handles cxx code generation.
 
 ## Usage from C++
 
-### Examples
+### Building with CMake (Recommended)
 
-The FFI includes two C++ example programs:
+The easiest way to integrate Stylo FFI into your C++ project is using CMake:
 
-1. **example.cpp** - General FFI demo showing all features
-2. **color_parser.cpp** - C++ version of the Rust color_parser.rs example
+```bash
+cd style/ffi
+mkdir build
+cd build
+cmake ..
+cmake --build .
 
-To build and run the examples:
+# Run the examples
+./color_parser
+./example
+```
+
+See [CMAKE_GUIDE.md](CMAKE_GUIDE.md) for detailed CMake usage and integration instructions.
+
+### Building with Make (Alternative)
+
+You can also use the traditional Makefile:
+
 ```bash
 cd style/ffi
 make color_parser    # Build the color_parser example
@@ -152,6 +166,13 @@ make run_color_parser  # Run the color_parser example
 make example         # Build the general example
 make run             # Run the general example
 ```
+
+### Examples
+
+The FFI includes two C++ example programs:
+
+1. **example.cpp** - General FFI demo showing all features
+2. **color_parser.cpp** - C++ version of the Rust color_parser.rs example
 
 ### Including in Your Project
 

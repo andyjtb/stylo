@@ -107,7 +107,18 @@ The FFI includes C++ examples demonstrating the features:
 - **example.cpp** - General FFI demonstration
 - **color_parser.cpp** - C++ version of the Rust color_parser.rs example
 
-To build and run:
+### Building with CMake (Recommended)
+
+```bash
+cd style/ffi
+mkdir build && cd build
+cmake ..
+cmake --build .
+./color_parser
+```
+
+### Building with Make (Alternative)
+
 ```bash
 cd style/ffi
 make color_parser && make run_color_parser
@@ -115,7 +126,7 @@ make color_parser && make run_color_parser
 
 ### Documentation
 
-See [style/ffi/README.md](style/ffi/README.md) for detailed documentation and usage examples.
+See [style/ffi/README.md](style/ffi/README.md) and [style/ffi/CMAKE_GUIDE.md](style/ffi/CMAKE_GUIDE.md) for detailed documentation and usage examples.
 
 ### Quick Example
 
