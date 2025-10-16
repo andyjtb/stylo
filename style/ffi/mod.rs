@@ -473,7 +473,10 @@ pub fn match_selector(selector: &str, element: &ffi::FFIElement) -> ffi::Selecto
 
     // Check if any selector in the list matches
     for selector in selector_list.slice().iter() {
-        if matches_selector(selector, 0, None, &ffi_elem, &mut context) {
+        // Match from the start of the selector (offset 0)
+        // No ancestor hashes available in FFI context
+        const SELECTOR_START_OFFSET: usize = 0;
+        if matches_selector(selector, SELECTOR_START_OFFSET, None, &ffi_elem, &mut context) {
             return ffi::SelectorMatchResult {
                 matches: true,
                 error_message: String::new(),
@@ -495,9 +498,21 @@ impl selectors::Element for FFIElementWrapper {
     type Impl = crate::selector_parser::SelectorImpl;
 
     fn opaque(&self) -> selectors::OpaqueElement {
-        selectors::OpaqueElement::from_non_null_ptr(
-            std::ptr::NonNull::new(self.0.ptr as *mut ()).expect("Element pointer should not be null")
-        )
+        // For null elements, we can't create a valid NonNull pointer
+        // Return a default opaque element representation
+        if self.0.ptr == 0 {
+            // Use a sentinel value for null elements
+            // This is safe because we check for null in other methods
+            unsafe {
+                selectors::OpaqueElement::from_non_null_ptr(
+                    std::ptr::NonNull::new_unchecked(1 as *mut ())
+                )
+            }
+        } else {
+            selectors::OpaqueElement::from_non_null_ptr(
+                std::ptr::NonNull::new(self.0.ptr as *mut ()).expect("Element pointer should not be null")
+            )
+        }
     }
 
     fn parent_element(&self) -> Option<Self> {
@@ -562,6 +577,11 @@ impl selectors::Element for FFIElementWrapper {
     }
 
     fn is_same_type(&self, other: &Self) -> bool {
+        // Check if both elements have the same tag name
+        // We need to get the tag name from C++ and compare
+        // For now, we can't easily do this without additional FFI callbacks
+        // As a fallback, check pointer equality (same element instance)
+        // TODO: Add element_get_tag_name callback for proper type comparison
         self.0.ptr == other.0.ptr
     }
 

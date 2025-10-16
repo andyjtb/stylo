@@ -7,6 +7,11 @@
  * 
  * This demonstrates how to implement the required callbacks to enable
  * selector matching with C++ element trees.
+ * 
+ * NOTE: Include path assumes cxx-generated headers are in the include path.
+ * Typical build setup:
+ *   -I target/<profile>/cxxbridge/include
+ *   -I target/<profile>/cxxbridge/crate
  */
 
 #include "stylo/ffi/mod.rs.h"
