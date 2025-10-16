@@ -60,6 +60,17 @@ endfunction()
 find_stylo_build_dir(STYLO_BUILD_DIR)
 find_cxx_lib_dir(CXX_LIB_DIR)
 
+# Copy selector_bridge.h to cxxbridge include directory after building Rust library
+add_custom_command(
+    TARGET stylo_rust_lib POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E make_directory ${STYLO_BUILD_DIR}/out/cxxbridge/include/stylo/ffi
+    COMMAND ${CMAKE_COMMAND} -E copy
+        ${CMAKE_CURRENT_SOURCE_DIR}/selector_bridge.h
+        ${STYLO_BUILD_DIR}/out/cxxbridge/include/stylo/ffi/selector_bridge.h
+    COMMENT "Copying selector_bridge.h to cxxbridge include directory..."
+    VERBATIM
+)
+
 # Create an interface library for Stylo
 add_library(stylo_ffi INTERFACE)
 add_dependencies(stylo_ffi stylo_rust_lib)
@@ -110,7 +121,15 @@ if(BUILD_EXAMPLES)
     add_executable(color_parser color_parser.cpp)
     target_link_libraries(color_parser PRIVATE stylo_ffi)
     
-    message(STATUS "Examples will be built: example, color_parser")
+    # Example 3: Selector matching (provides its own implementations)
+    # Note: Uses -Wl,--allow-multiple-definition to override stub implementations
+    add_executable(selector_example selector_example.cpp)
+    if(UNIX AND NOT APPLE)
+        target_link_options(selector_example PRIVATE -Wl,--allow-multiple-definition)
+    endif()
+    target_link_libraries(selector_example PRIVATE stylo_ffi)
+    
+    message(STATUS "Examples will be built: example, color_parser, selector_example")
 endif()
 
 # Installation rules
