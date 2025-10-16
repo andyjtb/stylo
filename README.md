@@ -106,6 +106,7 @@ Stylo now includes C++ bindings for CSS parsing facilities through the [cxx](htt
 The FFI includes C++ examples demonstrating the features:
 - **example.cpp** - General FFI demonstration
 - **color_parser.cpp** - C++ version of the Rust color_parser.rs example
+- **selector_example.cpp** - CSS selector matching demonstration
 
 ### Building with CMake (Recommended)
 
