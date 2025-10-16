@@ -188,10 +188,18 @@ Tests demonstrate the API but cannot fully test matching without C++ element imp
 
 ## Performance Characteristics
 
-- **Parsing**: Done on each `match_selector()` call (consider caching on C++ side)
+- **Parsing**: Done on each `match_selector()` call
+  - ⚠️ **Performance Note**: For repeated matching with the same selector, consider caching on C++ side
+  - Future enhancement: Expose parsed selector objects for reuse
 - **Matching**: Calls C++ callbacks for each element check
 - **Bloom Filter**: Disabled (could be enabled with hash callback)
 - **Memory**: No allocations for elements, minimal for selector parsing
+
+### Performance Recommendations for C++ Users:
+1. **Cache selector strings**: Reuse the same string for repeated matches
+2. **Batch similar operations**: Match multiple elements with same selector in sequence
+3. **Consider selector complexity**: Simpler selectors match faster
+4. **Future**: When selector caching is added, use exposed selector objects
 
 ## Limitations
 
