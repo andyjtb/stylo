@@ -326,6 +326,48 @@ mod tests {
         let result = get_computed_value("2em", "font-size", 16.0);
         assert!(result.success);
     }
+
+    #[test]
+    fn test_parse_selector_simple() {
+        let result = parse_selector("div");
+        assert!(result.success, "Should parse simple selector");
+        assert!(result.error_message.is_empty());
+    }
+
+    #[test]
+    fn test_parse_selector_complex() {
+        let result = parse_selector("div.my-class:hover > span#id");
+        assert!(result.success, "Should parse complex selector");
+        assert!(result.error_message.is_empty());
+    }
+
+    #[test]
+    fn test_parse_selector_invalid() {
+        let result = parse_selector(">>>invalid");
+        assert!(!result.success, "Should fail on invalid selector");
+        assert!(!result.error_message.is_empty());
+    }
+
+    #[test]
+    fn test_match_selector_null_element() {
+        let element = ffi::FFIElement { ptr: 0 };
+        let result = match_selector("div", &element);
+        // With a null element, is_element_null returns true,
+        // so most operations should return false/no match
+        assert!(!result.matches);
+    }
+
+    #[test]
+    fn test_parse_selector_pseudo_classes() {
+        let result = parse_selector("a:link");
+        assert!(result.success, "Should parse :link pseudo-class");
+        
+        let result = parse_selector("input:checked");
+        assert!(result.success, "Should parse :checked pseudo-class");
+        
+        let result = parse_selector("div:hover");
+        assert!(result.success, "Should parse :hover pseudo-class");
+    }
 }
 
 /// Parse and validate a media query

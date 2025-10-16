@@ -1,205 +1,255 @@
-# C++ FFI Implementation Summary
+# Stylo FFI Implementation Details
 
-## Overview
+This document provides technical details about the Stylo FFI implementation.
 
-This implementation successfully exposes Stylo's CSS parsing facilities to C++ using the [cxx](https://cxx.rs/) bridge, fulfilling the requirements specified in the issue.
+## Architecture Overview
 
-## Requirements Met
+The FFI layer uses [cxx](https://cxx.rs/) to provide safe, type-checked interop between Rust and C++.
 
-✅ **CSS Parsing**: Parse CSS stylesheets and individual values from C++  
-✅ **Media Queries**: Set and parse media queries from C++  
-✅ **Computed Values**: Get computed values back (basic implementation)  
-✅ **Calc Support**: Parse and evaluate calc() expressions  
+### Build Process
 
-## Implementation Details
+1. `build.rs` runs during compilation
+2. Generates properties code from Mako templates
+3. Invokes `cxx_build::bridge()` to generate C++/Rust bridge code
+4. Compiles C++ implementation files (`css_parser_bridge.cpp`, `selector_bridge.cpp`)
+5. Links everything together
 
-### Core Files Created
+### Generated Files
 
-1. **`style/ffi/mod.rs`** (8.9 kB)
-   - Main FFI module with all exposed functions
-   - Includes cxx bridge definitions
-   - Unit tests for all functions
+cxx generates the following during build:
+- `target/<profile>/cxxbridge/stylo/ffi/mod.rs.h` - C++ header with Rust function declarations
+- `target/<profile>/cxxbridge/sources/stylo/ffi/mod.rs.cc` - C++ bridge implementation
+- Rust FFI bindings for C++ functions
 
-2. **`style/ffi/css_parser_bridge.cpp`** (0.4 kB)
-   - C++ side of the bridge (minimal, cxx generates most code)
+## CSS Parser FFI
 
-3. **`style/ffi/README.md`** (4.7 kB)
-   - Comprehensive documentation
-   - Usage examples
-   - API reference
-   - Implementation status
+### Stylesheet Parsing
 
-4. **`style/ffi/example.cpp`** (3.7 kB)
-   - Complete C++ example demonstrating all features
-   - Error handling examples
-
-5. **`style/ffi/example_usage.h`** (2.3 kB)
-   - Header showing C++ API usage patterns
-
-6. **`style/ffi/Makefile`** (1.7 kB)
-   - Build support for C++ examples
-   - Handles library linking and includes
-
-### Modified Files
-
-1. **`style/Cargo.toml`**
-   - Added `cxx = "1.0"` dependency
-   - Added `cxx-build = "1.0"` build dependency
-
-2. **`style/build.rs`**
-   - Integrated cxx-build for code generation
-   - Compiles the C++ bridge
-
-3. **`style/lib.rs`**
-   - Exported the ffi module
-
-4. **`README.md`**
-   - Added C++ FFI section with quick start
-
-## API Functions Exposed
-
-### 1. Stylesheet Parsing
 ```rust
-fn parse_stylesheet(css: &str, base_url: &str) -> ParseResult
+pub fn parse_stylesheet(css: &str, base_url: &str) -> ParseResult
 ```
-- Parses complete CSS stylesheets
-- Validates URL format
-- Returns success/error status
 
-### 2. Media Query Parsing
+Implementation:
+1. Parses base URL using `url::Url::parse()`
+2. Creates `UrlExtraData` for the stylesheet
+3. Uses `Stylesheet::from_str()` to parse CSS
+4. Returns success/failure with error message
+
+### Media Query Parsing
+
 ```rust
-fn parse_media_query(query: &str) -> ParseResult
+pub fn parse_media_query(query: &str) -> ParseResult
 ```
-- Parses and validates media queries
-- Supports full media query syntax
-- Examples: `"(min-width: 768px)"`, `"screen and (orientation: landscape)"`
 
-### 3. CSS Value Parsing
+Implementation:
+1. Creates a `ParserContext` with default settings
+2. Uses `MediaQuery::parse()` from the media_queries module
+3. Returns validation result
+
+### Calc Expression Evaluation
+
 ```rust
-fn parse_css_value(value: &str, property_name: &str) -> ParsedCSSValue
+pub fn evaluate_calc_expression(expr: &str) -> CalcResult
 ```
-- Validates CSS values
-- Property-aware parsing (basic)
 
-### 4. Calc Expression Evaluation
+Implementation:
+1. Attempts to parse as `calc()` function
+2. Uses `CalcNode::parse()` with all calc units allowed
+3. Tries to extract numeric value from simple expressions
+4. Falls back to parsing as plain number
+
+## Selector Matching FFI
+
+The selector matching system provides a bridge between Rust's selector engine and C++ element trees.
+
+### Design Philosophy
+
+Rather than trying to marshal C++ elements into Rust, we use a callback-based approach:
+- C++ maintains its own element tree
+- Rust calls C++ functions to navigate and query elements
+- Minimal data copying; pointers used for identity
+
+### FFIElement Type
+
 ```rust
-fn evaluate_calc_expression(expr: &str) -> CalcResult
-```
-- Parses calc() expressions using CalcNode
-- Extracts numeric values from simple expressions
-- Fallback support for plain numbers
-
-### 5. Computed Value Resolution
-```rust
-fn get_computed_value(value: &str, property_name: &str, base_font_size: f32) -> ParsedCSSValue
-```
-- Basic computed value resolution
-- Foundation for full context-aware resolution
-
-## Data Types
-
-### ParseResult
-```rust
-struct ParseResult {
-    success: bool,
-    error_message: String,
+#[derive(Debug, Clone)]
+pub struct FFIElement {
+    pub ptr: usize,
 }
 ```
 
-### ParsedCSSValue
+- Opaque pointer to C++ element
+- Copied by value (cheap, just a usize)
+- C++ is responsible for memory management
+- Null element represented by `ptr = 0`
+
+### Element Trait Implementation
+
+`FFIElementWrapper` implements the `selectors::Element` trait:
+
 ```rust
-struct ParsedCSSValue {
-    value: String,
-    success: bool,
+struct FFIElementWrapper(FFIElement);
+
+impl selectors::Element for FFIElementWrapper {
+    type Impl = crate::selector_parser::SelectorImpl;
+    // ... implementation
 }
 ```
 
-### CalcResult
-```rust
-struct CalcResult {
-    value: f32,
-    success: bool,
-}
-```
+Key trait methods:
+- `parent_element()` - Calls C++ `get_parent_element()`
+- `prev_sibling_element()` - Calls C++ `get_prev_sibling_element()`
+- `next_sibling_element()` - Calls C++ `get_next_sibling_element()`
+- `first_element_child()` - Calls C++ `get_first_element_child()`
+- `has_local_name()` - Calls C++ `element_has_local_name()`
+- `has_id()` - Calls C++ `element_has_id()`
+- `has_class()` - Calls C++ `element_has_class()`
+- `match_non_ts_pseudo_class()` - Uses element state from C++
 
-## Build Process
+### Selector Matching Flow
 
-1. **Cargo builds Rust library** → `libstylo.a`
-2. **cxx-build generates bridge** → C++ headers and source
-3. **Compiles C++ bridge** → `libstylo_css_parser_ffi.a`
-4. **C++ code includes** → Generated headers from `target/debug/build/stylo-<hash>/out/cxxbridge/include/`
+1. C++ calls `match_selector(selector, element)`
+2. Rust parses selector string into `SelectorList`
+3. Creates `FFIElementWrapper` around `FFIElement`
+4. Creates `MatchingContext` with no bloom filter
+5. For each selector in list:
+   - Calls `matches_selector()` from selectors crate
+   - Selector engine calls trait methods on `FFIElementWrapper`
+   - These methods call back to C++ functions
+   - C++ provides element data
+6. Returns `SelectorMatchResult` with match status
 
-## Testing
+### State Management
 
-- ✅ Unit tests for all FFI functions
-- ✅ Build verification successful
-- ✅ No warnings in FFI module
-- ✅ C++ example code provided
+Element and document states are exposed as u64 bitflags:
 
-## Usage Example
+#### ElementState (from `dom` crate)
+- Represented as `u64` bitmask
+- Flags include: ACTIVE, FOCUS, HOVER, ENABLED, DISABLED, CHECKED, etc.
+- C++ returns state via `get_element_state()`
+- Rust converts to `ElementState` with `from_bits_truncate()`
 
+#### DocumentState (from `dom` crate)
+- Represented as `u64` bitmask  
+- Flags include: WINDOW_INACTIVE, RTL_LOCALE, LTR_LOCALE
+- C++ returns state via `get_document_state()`
+
+Example state usage in C++:
 ```cpp
-#include "stylo/ffi/mod.rs.h"
+const uint64_t HOVER = 1 << 2;
+const uint64_t ACTIVE = 1 << 0;
 
-// Parse stylesheet
-auto result = parse_stylesheet(
-    "body { color: red; font-size: 16px; }",
-    "https://example.com/style.css"
-);
-
-if (result.success) {
-    std::cout << "Parsed successfully!" << std::endl;
-}
-
-// Parse media query
-auto media = parse_media_query("(min-width: 768px)");
-
-// Evaluate calc
-auto calc = evaluate_calc_expression("calc(100)");
-if (calc.success) {
-    std::cout << "Result: " << calc.value << std::endl;
-}
+DOMElement elem;
+elem.state = HOVER | ACTIVE;  // Element is being hovered and active
 ```
 
-## Future Enhancements
+### Required C++ Callbacks
 
-The foundation is in place for:
+C++ must implement these functions:
 
-1. **Full Computed Value Resolution**
-   - With rendering context
-   - Element-aware computation
+**Navigation:**
+- `FFIElement get_parent_element(const FFIElement&)`
+- `FFIElement get_prev_sibling_element(const FFIElement&)`
+- `FFIElement get_next_sibling_element(const FFIElement&)`
+- `FFIElement get_first_element_child(const FFIElement&)`
 
-2. **Advanced Calc Evaluation**
-   - Mixed unit support (px, em, %, etc.)
-   - Complex expressions
+**State:**
+- `uint64_t get_element_state(const FFIElement&)`
+- `uint64_t get_document_state(const FFIElement&)`
 
-3. **Property-Specific Validation**
-   - Type checking per CSS property
-   - Value range validation
+**Properties:**
+- `bool is_element_null(const FFIElement&)`
+- `bool element_has_local_name(const FFIElement&, rust::Str)`
+- `bool element_has_namespace(const FFIElement&, rust::Str)`
+- `bool element_has_id(const FFIElement&, rust::Str)`
+- `bool element_has_class(const FFIElement&, rust::Str)`
+- `bool element_is_link(const FFIElement&)`
+- `bool element_is_root(const FFIElement&)`
+- `bool element_is_empty(const FFIElement&)`
 
-4. **Stylesheet Manipulation**
-   - Add/remove rules
-   - Modify existing rules
+### Selector Support
 
-5. **Error Reporting**
-   - Line and column information
-   - Detailed parse error context
+Currently supported:
+- ✅ Type selectors (`div`, `span`)
+- ✅ ID selectors (`#myid`)
+- ✅ Class selectors (`.myclass`)
+- ✅ Combinators (`>`, `+`, `~`, ` `)
+- ✅ State pseudo-classes (`:hover`, `:active`, `:focus`, etc.)
+- ✅ Link pseudo-classes (`:link`, `:visited`, `:any-link`)
+- ✅ Form state pseudo-classes (`:enabled`, `:disabled`, `:checked`)
+- ✅ Root pseudo-class (`:root`)
+- ✅ Empty pseudo-class (`:empty`)
 
-## Technical Notes
+Not yet supported in FFI:
+- ❌ Attribute selectors (`[attr=value]`)
+- ❌ Pseudo-elements (`::before`, `::after`)
+- ❌ Shadow DOM pseudo-elements (`::slotted`, `::part`)
+- ❌ Custom state (`:--custom`)
+- ❌ Some structural pseudo-classes (`:nth-child`, `:first-child`, etc.)
 
-- **Type Safety**: cxx ensures type-safe C++/Rust interop
-- **Zero Copy**: String views used where possible
-- **Error Handling**: All functions return result types
-- **Compatibility**: C++14 or later required
-- **Thread Safety**: Functions are thread-safe (no shared mutable state)
+The unsupported features return false or are not available due to limitations in the current FFI implementation.
 
-## Conclusion
+## Performance Considerations
 
-This implementation successfully exposes Stylo's CSS parsing facilities to C++ as requested. The API is:
-- **Safe**: Type-safe with cxx
-- **Complete**: Covers all requested features
-- **Documented**: Full documentation and examples
-- **Tested**: Unit tests for all functions
-- **Extensible**: Easy to add more features
+### Zero-Copy Design
+- Strings passed as `rust::Str` (string views, no copy)
+- Elements passed as pointers (usize)
+- State passed as primitive u64
 
-The foundation is solid for future enhancements while maintaining API stability.
+### Bloom Filter
+- Currently disabled for FFI (`bloom_filter: None`)
+- Could be enabled if C++ provides element hashes
+- Would improve performance for deep selector matching
+
+### Caching
+- No caching currently implemented
+- C++ is responsible for any element caching
+- Selector parsing is done on each `match_selector()` call
+  - Consider caching parsed selectors on C++ side for repeated matching
+
+## Thread Safety
+
+- FFI functions are not explicitly marked as thread-safe
+- Element pointers are passed as raw usize values
+- C++ is responsible for:
+  - Element lifetime management
+  - Thread synchronization if elements are accessed from multiple threads
+- Rust selector matching is thread-safe if element callbacks are thread-safe
+
+## Memory Management
+
+- Rust does not manage element memory
+- C++ owns all element objects
+- FFI only stores element pointers (usize)
+- C++ must ensure elements live long enough for matching operation
+- No reference counting or garbage collection across FFI boundary
+
+## Error Handling
+
+All public FFI functions return result types:
+- Parse errors include descriptive messages
+- Invalid selectors are caught during parsing
+- Null elements are handled gracefully (return `ptr = 0`)
+- C++ callbacks should not throw exceptions (undefined behavior)
+
+## Future Improvements
+
+1. **Attribute Matching**: Implement attribute selectors
+   - Requires additional C++ callback for attribute queries
+   
+2. **Structural Pseudo-classes**: Support :nth-child, :first-child, etc.
+   - Requires sibling counting callbacks
+   
+3. **Selector Caching**: Cache parsed selectors
+   - Expose selector list type to C++
+   - Allow reusing parsed selectors
+   
+4. **Bloom Filter**: Enable for performance
+   - Add element hash callback
+   - Implement bloom filter population
+   
+5. **Batch Matching**: Match multiple selectors at once
+   - More efficient for style resolution
+   
+6. **Incremental Matching**: Support invalidation
+   - Track which selectors might match after DOM changes
