@@ -34,6 +34,66 @@ mod ffi {
         pub success: bool,
     }
 
+    /// FFI Element representation for selector matching
+    /// This is implemented on the C++ side
+    #[derive(Debug, Clone)]
+    pub struct FFIElement {
+        /// Opaque pointer to the C++ element
+        pub ptr: usize,
+    }
+
+    /// Result of selector matching operation
+    pub struct SelectorMatchResult {
+        pub matches: bool,
+        pub error_message: String,
+    }
+
+    unsafe extern "C++" {
+        include!("stylo/ffi/selector_bridge.h");
+
+        /// Get the element state from C++
+        fn get_element_state(element: &FFIElement) -> u64;
+        
+        /// Get the document state from C++
+        fn get_document_state(element: &FFIElement) -> u64;
+
+        /// Get parent element
+        fn get_parent_element(element: &FFIElement) -> FFIElement;
+
+        /// Get previous sibling element
+        fn get_prev_sibling_element(element: &FFIElement) -> FFIElement;
+
+        /// Get next sibling element
+        fn get_next_sibling_element(element: &FFIElement) -> FFIElement;
+
+        /// Get first child element
+        fn get_first_element_child(element: &FFIElement) -> FFIElement;
+
+        /// Check if element is null/invalid
+        fn is_element_null(element: &FFIElement) -> bool;
+
+        /// Check if element has a given local name
+        fn element_has_local_name(element: &FFIElement, name: &str) -> bool;
+
+        /// Check if element has a given namespace
+        fn element_has_namespace(element: &FFIElement, ns: &str) -> bool;
+
+        /// Check if element has an id
+        fn element_has_id(element: &FFIElement, id: &str) -> bool;
+
+        /// Check if element has a class
+        fn element_has_class(element: &FFIElement, clazz: &str) -> bool;
+
+        /// Check if element is a link
+        fn element_is_link(element: &FFIElement) -> bool;
+
+        /// Check if element is root
+        fn element_is_root(element: &FFIElement) -> bool;
+
+        /// Check if element is empty
+        fn element_is_empty(element: &FFIElement) -> bool;
+    }
+
     extern "Rust" {
         /// Parse a CSS stylesheet from a string
         fn parse_stylesheet(css: &str, base_url: &str) -> ParseResult;
@@ -53,6 +113,12 @@ mod ffi {
             property_name: &str,
             base_font_size: f32,
         ) -> ParsedCSSValue;
+
+        /// Parse a CSS selector
+        fn parse_selector(selector: &str) -> ParseResult;
+
+        /// Match a selector against an element
+        fn match_selector(selector: &str, element: &FFIElement) -> SelectorMatchResult;
     }
 }
 
@@ -307,5 +373,254 @@ pub fn get_computed_value(
     ffi::ParsedCSSValue {
         value: value.to_string(),
         success: !value.is_empty(),
+    }
+}
+
+/// Parse a CSS selector
+pub fn parse_selector(selector: &str) -> ffi::ParseResult {
+    use crate::selector_parser::SelectorParser;
+    
+    let url = url::Url::parse("about:blank").unwrap();
+    let url_data = UrlExtraData::from(url);
+    
+    match SelectorParser::parse_author_origin_no_namespace(selector, &url_data) {
+        Ok(_selector_list) => ffi::ParseResult {
+            success: true,
+            error_message: String::new(),
+        },
+        Err(e) => ffi::ParseResult {
+            success: false,
+            error_message: format!("Failed to parse selector: {:?}", e),
+        },
+    }
+}
+
+/// Match a selector against an element
+pub fn match_selector(selector: &str, element: &ffi::FFIElement) -> ffi::SelectorMatchResult {
+    use crate::selector_parser::SelectorParser;
+    use selectors::matching::{matches_selector, MatchingContext, MatchingMode, NeedsSelectorFlags, MatchingForInvalidation};
+    use selectors::context::{QuirksMode as SelectorQuirksMode, SelectorCaches};
+    
+    // Parse the selector
+    let url = url::Url::parse("about:blank").unwrap();
+    let url_data = UrlExtraData::from(url);
+    
+    let selector_list = match SelectorParser::parse_author_origin_no_namespace(selector, &url_data) {
+        Ok(list) => list,
+        Err(e) => {
+            return ffi::SelectorMatchResult {
+                matches: false,
+                error_message: format!("Failed to parse selector: {:?}", e),
+            };
+        }
+    };
+
+    // Create FFI element wrapper
+    let ffi_elem = FFIElementWrapper(element.clone());
+    
+    // Create matching context
+    let mut caches = SelectorCaches::default();
+    let mut context = MatchingContext::new(
+        MatchingMode::Normal,
+        None, // bloom filter
+        &mut caches,
+        SelectorQuirksMode::NoQuirks,
+        NeedsSelectorFlags::No,
+        MatchingForInvalidation::No,
+    );
+
+    // Check if any selector in the list matches
+    for selector in selector_list.slice().iter() {
+        if matches_selector(selector, 0, None, &ffi_elem, &mut context) {
+            return ffi::SelectorMatchResult {
+                matches: true,
+                error_message: String::new(),
+            };
+        }
+    }
+
+    ffi::SelectorMatchResult {
+        matches: false,
+        error_message: String::new(),
+    }
+}
+
+/// Wrapper around FFIElement that implements the Element trait
+#[derive(Clone, Debug)]
+struct FFIElementWrapper(ffi::FFIElement);
+
+impl selectors::Element for FFIElementWrapper {
+    type Impl = crate::selector_parser::SelectorImpl;
+
+    fn opaque(&self) -> selectors::OpaqueElement {
+        selectors::OpaqueElement::from_non_null_ptr(
+            std::ptr::NonNull::new(self.0.ptr as *mut ()).expect("Element pointer should not be null")
+        )
+    }
+
+    fn parent_element(&self) -> Option<Self> {
+        let parent = ffi::get_parent_element(&self.0);
+        if ffi::is_element_null(&parent) {
+            None
+        } else {
+            Some(FFIElementWrapper(parent))
+        }
+    }
+
+    fn parent_node_is_shadow_root(&self) -> bool {
+        false // Not supported in FFI for now
+    }
+
+    fn containing_shadow_host(&self) -> Option<Self> {
+        None // Not supported in FFI for now
+    }
+
+    fn is_pseudo_element(&self) -> bool {
+        false // Not supported in FFI for now
+    }
+
+    fn prev_sibling_element(&self) -> Option<Self> {
+        let sibling = ffi::get_prev_sibling_element(&self.0);
+        if ffi::is_element_null(&sibling) {
+            None
+        } else {
+            Some(FFIElementWrapper(sibling))
+        }
+    }
+
+    fn next_sibling_element(&self) -> Option<Self> {
+        let sibling = ffi::get_next_sibling_element(&self.0);
+        if ffi::is_element_null(&sibling) {
+            None
+        } else {
+            Some(FFIElementWrapper(sibling))
+        }
+    }
+
+    fn first_element_child(&self) -> Option<Self> {
+        let child = ffi::get_first_element_child(&self.0);
+        if ffi::is_element_null(&child) {
+            None
+        } else {
+            Some(FFIElementWrapper(child))
+        }
+    }
+
+    fn is_html_element_in_html_document(&self) -> bool {
+        // For FFI, we'll assume HTML context
+        true
+    }
+
+    fn has_local_name(&self, local_name: &<Self::Impl as selectors::SelectorImpl>::BorrowedLocalName) -> bool {
+        ffi::element_has_local_name(&self.0, local_name)
+    }
+
+    fn has_namespace(&self, ns: &<Self::Impl as selectors::SelectorImpl>::BorrowedNamespaceUrl) -> bool {
+        ffi::element_has_namespace(&self.0, ns)
+    }
+
+    fn is_same_type(&self, other: &Self) -> bool {
+        self.0.ptr == other.0.ptr
+    }
+
+    fn attr_matches(
+        &self,
+        _ns: &selectors::attr::NamespaceConstraint<&<Self::Impl as selectors::SelectorImpl>::NamespaceUrl>,
+        _local_name: &<Self::Impl as selectors::SelectorImpl>::LocalName,
+        _operation: &selectors::attr::AttrSelectorOperation<&<Self::Impl as selectors::SelectorImpl>::AttrValue>,
+    ) -> bool {
+        // Attribute matching would need more FFI callbacks
+        false
+    }
+
+    fn match_non_ts_pseudo_class(
+        &self,
+        pc: &<Self::Impl as selectors::SelectorImpl>::NonTSPseudoClass,
+        _context: &mut selectors::matching::MatchingContext<Self::Impl>,
+    ) -> bool {
+        use crate::selector_parser::NonTSPseudoClass;
+        use dom::ElementState;
+
+        let state = ElementState::from_bits_truncate(ffi::get_element_state(&self.0));
+        
+        // Match against element state
+        match pc {
+            NonTSPseudoClass::Active => state.contains(ElementState::ACTIVE),
+            NonTSPseudoClass::Focus => state.contains(ElementState::FOCUS),
+            NonTSPseudoClass::Hover => state.contains(ElementState::HOVER),
+            NonTSPseudoClass::Enabled => state.contains(ElementState::ENABLED),
+            NonTSPseudoClass::Disabled => state.contains(ElementState::DISABLED),
+            NonTSPseudoClass::Checked => state.contains(ElementState::CHECKED),
+            NonTSPseudoClass::Indeterminate => state.contains(ElementState::INDETERMINATE),
+            NonTSPseudoClass::PlaceholderShown => state.contains(ElementState::PLACEHOLDER_SHOWN),
+            NonTSPseudoClass::Target => state.contains(ElementState::URLTARGET),
+            NonTSPseudoClass::Visited => state.contains(ElementState::VISITED),
+            NonTSPseudoClass::Link => state.contains(ElementState::UNVISITED),
+            NonTSPseudoClass::AnyLink => state.intersects(ElementState::VISITED_OR_UNVISITED),
+            _ => false, // Other pseudo-classes not yet implemented for FFI
+        }
+    }
+
+    fn match_pseudo_element(
+        &self,
+        _pe: &<Self::Impl as selectors::SelectorImpl>::PseudoElement,
+        _context: &mut selectors::matching::MatchingContext<Self::Impl>,
+    ) -> bool {
+        false // Pseudo-elements not supported in FFI for now
+    }
+
+    fn apply_selector_flags(&self, _flags: selectors::matching::ElementSelectorFlags) {
+        // No-op for FFI elements
+    }
+
+    fn is_link(&self) -> bool {
+        ffi::element_is_link(&self.0)
+    }
+
+    fn is_html_slot_element(&self) -> bool {
+        false // Not supported in FFI for now
+    }
+
+    fn has_id(
+        &self,
+        id: &<Self::Impl as selectors::SelectorImpl>::Identifier,
+        _case_sensitivity: selectors::attr::CaseSensitivity,
+    ) -> bool {
+        ffi::element_has_id(&self.0, id)
+    }
+
+    fn has_class(
+        &self,
+        name: &<Self::Impl as selectors::SelectorImpl>::Identifier,
+        _case_sensitivity: selectors::attr::CaseSensitivity,
+    ) -> bool {
+        ffi::element_has_class(&self.0, name)
+    }
+
+    fn has_custom_state(&self, _name: &<Self::Impl as selectors::SelectorImpl>::Identifier) -> bool {
+        false // Not supported in FFI for now
+    }
+
+    fn imported_part(
+        &self,
+        _name: &<Self::Impl as selectors::SelectorImpl>::Identifier,
+    ) -> Option<<Self::Impl as selectors::SelectorImpl>::Identifier> {
+        None // Not supported in FFI for now
+    }
+
+    fn is_part(&self, _name: &<Self::Impl as selectors::SelectorImpl>::Identifier) -> bool {
+        false // Not supported in FFI for now
+    }
+
+    fn is_empty(&self) -> bool {
+        ffi::element_is_empty(&self.0)
+    }
+
+    fn is_root(&self) -> bool {
+        ffi::element_is_root(&self.0)
+    }
+
+    fn add_element_unique_hashes(&self, _filter: &mut selectors::bloom::BloomFilter) -> bool {
+        false // Bloom filter not used for FFI
     }
 }
