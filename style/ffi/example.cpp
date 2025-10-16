@@ -1,14 +1,14 @@
 /**
  * Example C++ program demonstrating Stylo CSS Parser FFI usage
  * 
- * To compile this example, you would need to:
- * 1. Build the stylo library with `cargo build`
+ * To compile this example:
+ * 1. Build the stylo library with: cargo build
  * 2. Link against the generated static library
  * 3. Include the generated bridge header
  * 
  * Build command example:
  * g++ -std=c++14 \
- *     -I target/debug/build/stylo-*/out/cxxbridge/include \
+ *     -I target/debug/build/stylo-HASH/out/cxxbridge/include \
  *     -L target/debug \
  *     -o example \
  *     example.cpp \
@@ -17,9 +17,9 @@
  *     -lpthread -ldl
  */
 
-#include "stylo/ffi/mod.rs.h"
 #include <iostream>
 #include <string>
+#include "stylo/ffi/mod.rs.h"
 
 int main() {
     std::cout << "=== Stylo CSS Parser FFI Demo ===" << std::endl;

@@ -97,12 +97,36 @@ Stylo now includes C++ bindings for CSS parsing facilities through the [cxx](htt
 - Parse CSS stylesheets from strings
 - Parse and validate media queries
 - Parse individual CSS values
+- Parse CSS colors (all formats: named, hex, rgb, hsl, etc.)
 - Evaluate calc() expressions
 - Get computed values for CSS properties
 
+### Examples
+
+The FFI includes C++ examples demonstrating the features:
+- **example.cpp** - General FFI demonstration
+- **color_parser.cpp** - C++ version of the Rust color_parser.rs example
+
+### Building with CMake (Recommended)
+
+```bash
+cd style/ffi
+mkdir build && cd build
+cmake ..
+cmake --build .
+./color_parser
+```
+
+### Building with Make (Alternative)
+
+```bash
+cd style/ffi
+make color_parser && make run_color_parser
+```
+
 ### Documentation
 
-See [style/ffi/README.md](style/ffi/README.md) for detailed documentation and usage examples.
+See [style/ffi/README.md](style/ffi/README.md) and [style/ffi/CMAKE_GUIDE.md](style/ffi/CMAKE_GUIDE.md) for detailed documentation and usage examples.
 
 ### Quick Example
 
@@ -118,6 +142,16 @@ auto result = parse_stylesheet(
 
 if (result.success) {
     // Stylesheet parsed successfully
+}
+
+// Parse a color - returns structured data
+auto color = parse_color("hsla(-300, 100%, 37.5%, -3)");
+if (color.success) {
+    // Access color components directly
+    std::cout << "Color space: " << color.color_space << std::endl;
+    std::cout << "RGB/HSL components: " << color.components.c0 << ", " 
+              << color.components.c1 << ", " << color.components.c2 << std::endl;
+    std::cout << "Alpha: " << color.alpha << std::endl;
 }
 ```
 

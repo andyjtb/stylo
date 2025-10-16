@@ -3,3 +3,6 @@
 /target/
 /style/properties/__pycache__/
 Cargo.lock
+/style/ffi/example
+/style/ffi/color_parser
+/style/ffi/build/
