@@ -1,0 +1,38 @@
+$ cd style/ffi
+$ mkdir build && cd build
+$ cmake ..
+-- The CXX compiler identification is GNU 13.2.0
+-- Found Cargo: /usr/bin/cargo
+-- Found Stylo build directory: ../../target/debug/build/stylo-296d6c77af483447
+-- Found cxxbridge library directory: ../../target/debug/build/cxx-5c360a931ed4eceb/out
+-- Examples will be built: example, color_parser
+
+Stylo FFI Configuration:
+  C++ Standard: 14
+  Build Type: 
+  Rust Target Dir: ../../target
+  Stylo Build Dir: ../../target/debug/build/stylo-296d6c77af483447
+  CXX Lib Dir: ../../target/debug/build/cxx-5c360a931ed4eceb/out
+  Build Examples: ON
+
+-- Configuring done
+-- Generating done
+-- Build files have been written to: build
+
+$ cmake --build .
+[ 20%] Building Rust Stylo library...
+[ 20%] Built target stylo_rust_lib
+[ 40%] Building CXX object CMakeFiles/example.dir/example.cpp.o
+[ 60%] Linking CXX executable example
+[ 60%] Built target example
+[ 80%] Building CXX object CMakeFiles/color_parser.dir/color_parser.cpp.o
+[100%] Linking CXX executable color_parser
+[100%] Built target color_parser
+
+$ ./color_parser
+=== Stylo Color Parser Example (C++) ===
+
+Parsing color: hsla(-300, 100%, 37.5%, -3)
+
+Successfully parsed color: ColorPropertyValue(Absolute(Absolute { color: AbsoluteColor { components: ColorComponents(60.0, 100.0, 37.5), alpha: 0.0, color_space: Hsl, flags: ColorFlags(16) }, authored: None }))
+✓ Color parsed successfully!
