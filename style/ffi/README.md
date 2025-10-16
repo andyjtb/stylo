@@ -79,6 +79,26 @@ if (computed.success) {
 }
 ```
 
+### 6. Color Parsing
+Parse CSS color values:
+```rust
+parse_color(color_str: &str) -> ParsedCSSValue
+```
+
+Example:
+```cpp
+auto color = parse_color("hsla(-300, 100%, 37.5%, -3)");
+if (color.success) {
+    std::cout << "Parsed color: " << color.value << std::endl;
+}
+```
+
+Supports all CSS color formats:
+- Named colors: `red`, `blue`, `transparent`
+- Hex colors: `#ff0000`, `#f00`
+- RGB/RGBA: `rgb(255, 0, 0)`, `rgba(0, 128, 255, 0.5)`
+- HSL/HSLA: `hsl(120, 100%, 50%)`, `hsla(-300, 100%, 37.5%, -3)`
+
 ## Types
 
 ### ParseResult
@@ -113,7 +133,27 @@ The FFI is automatically built when you build the stylo crate with the following
 
 The build.rs file handles cxx code generation.
 
+**Note:** To enable C++ linking, the style crate is built as both `rlib` and `staticlib` (see `Cargo.toml`).
+
 ## Usage from C++
+
+### Examples
+
+The FFI includes two C++ example programs:
+
+1. **example.cpp** - General FFI demo showing all features
+2. **color_parser.cpp** - C++ version of the Rust color_parser.rs example
+
+To build and run the examples:
+```bash
+cd style/ffi
+make color_parser    # Build the color_parser example
+make run_color_parser  # Run the color_parser example
+make example         # Build the general example
+make run             # Run the general example
+```
+
+### Including in Your Project
 
 See `example_usage.h` for C++ usage examples.
 

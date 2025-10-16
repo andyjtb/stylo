@@ -97,8 +97,21 @@ Stylo now includes C++ bindings for CSS parsing facilities through the [cxx](htt
 - Parse CSS stylesheets from strings
 - Parse and validate media queries
 - Parse individual CSS values
+- Parse CSS colors (all formats: named, hex, rgb, hsl, etc.)
 - Evaluate calc() expressions
 - Get computed values for CSS properties
+
+### Examples
+
+The FFI includes C++ examples demonstrating the features:
+- **example.cpp** - General FFI demonstration
+- **color_parser.cpp** - C++ version of the Rust color_parser.rs example
+
+To build and run:
+```bash
+cd style/ffi
+make color_parser && make run_color_parser
+```
 
 ### Documentation
 
@@ -118,6 +131,12 @@ auto result = parse_stylesheet(
 
 if (result.success) {
     // Stylesheet parsed successfully
+}
+
+// Parse a color
+auto color = parse_color("hsla(-300, 100%, 37.5%, -3)");
+if (color.success) {
+    std::cout << "Parsed: " << color.value << std::endl;
 }
 ```
 

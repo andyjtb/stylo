@@ -53,6 +53,9 @@ mod ffi {
             property_name: &str,
             base_font_size: f32,
         ) -> ParsedCSSValue;
+
+        /// Parse a CSS color value
+        fn parse_color(color_str: &str) -> ParsedCSSValue;
     }
 }
 
@@ -260,6 +263,31 @@ mod tests {
         let result = get_computed_value("2em", "font-size", 16.0);
         assert!(result.success);
     }
+
+    #[test]
+    fn test_parse_color() {
+        let result = parse_color("hsla(-300, 100%, 37.5%, -3)");
+        assert!(result.success, "Should successfully parse color");
+        assert!(!result.value.is_empty());
+    }
+
+    #[test]
+    fn test_parse_color_simple() {
+        let result = parse_color("red");
+        assert!(result.success, "Should parse named color");
+    }
+
+    #[test]
+    fn test_parse_color_hex() {
+        let result = parse_color("#ff0000");
+        assert!(result.success, "Should parse hex color");
+    }
+
+    #[test]
+    fn test_parse_color_rgb() {
+        let result = parse_color("rgb(255, 0, 0)");
+        assert!(result.success, "Should parse rgb color");
+    }
 }
 
 /// Parse and validate a media query
@@ -307,5 +335,44 @@ pub fn get_computed_value(
     ffi::ParsedCSSValue {
         value: value.to_string(),
         success: !value.is_empty(),
+    }
+}
+
+/// Parse a CSS color value
+pub fn parse_color(color_str: &str) -> ffi::ParsedCSSValue {
+    use crate::properties::longhands::color;
+    use cssparser::{Parser, ParserInput};
+    use std::borrow::Cow;
+
+    // Create a dummy URL for the parser context
+    let url = url::Url::parse("http://example.com").unwrap();
+    let url_data = UrlExtraData::from(url);
+
+    // Create a parser context
+    let context = ParserContext::new(
+        Origin::Author,
+        &url_data,
+        None, // rule_type is optional
+        ParsingMode::DEFAULT,
+        QuirksMode::NoQuirks,
+        Cow::Owned(crate::stylesheets::Namespaces::default()),
+        None, // error_reporter
+        None, // use_counters
+    );
+
+    // Create a parser
+    let mut input = ParserInput::new(color_str);
+    let mut parser = Parser::new(&mut input);
+
+    // Parse the color
+    match color::parse(&context, &mut parser) {
+        Ok(color) => ffi::ParsedCSSValue {
+            value: format!("{:?}", color),
+            success: true,
+        },
+        Err(e) => ffi::ParsedCSSValue {
+            value: format!("Failed to parse color: {:?}", e),
+            success: false,
+        },
     }
 }
