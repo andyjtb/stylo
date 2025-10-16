@@ -88,6 +88,39 @@ stylo_malloc_size_of = { path = "../stylo/malloc_size_of" }
 stylo_traits = { path = "../stylo/style_traits" }
 ```
 
+## C++ FFI for CSS Parsing
+
+Stylo now includes C++ bindings for CSS parsing facilities through the [cxx](https://cxx.rs/) bridge. This allows C++ applications to use Stylo's CSS parser directly.
+
+### Features
+
+- Parse CSS stylesheets from strings
+- Parse and validate media queries
+- Parse individual CSS values
+- Evaluate calc() expressions
+- Get computed values for CSS properties
+
+### Documentation
+
+See [style/ffi/README.md](style/ffi/README.md) for detailed documentation and usage examples.
+
+### Quick Example
+
+```cpp
+// Include the generated cxx bridge header from:
+// target/debug/build/stylo-<hash>/out/cxxbridge/include/stylo/ffi/mod.rs.h
+#include "stylo/ffi/mod.rs.h"
+
+auto result = parse_stylesheet(
+    "body { color: red; }",
+    "https://example.com/style.css"
+);
+
+if (result.success) {
+    // Stylesheet parsed successfully
+}
+```
+
 ## Releases
 
 Releases are made every time this repository rebases its changes on top of the latest version of upstream Stylo. There are a lot of crates here. In order to publish them, they must be done in order. One order that works is:

@@ -1,0 +1,20 @@
+# File: /Users/andy/Desktop/stylo/example/Cargo.toml
+
+[package]
+name = "stylo_example"
+version = "0.1.0"
+edition = "2021"
+
+[[bin]]
+name = "color_parser"
+path = "color_parser.rs"
+
+[dependencies]
+cssparser = "0.35"
+stylo = { path = "../style" }
+stylo_traits = { path = "../style_traits" }
+url = "2.5.4"
+
+[features]
+default = ["servo"]
+servo = ["stylo/servo"]

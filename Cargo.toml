@@ -1,6 +1,7 @@
 [workspace]
 resolver = "2"
 members = [
+    "examples",
     "stylo_atoms",
     "stylo_dom",
     "malloc_size_of",
