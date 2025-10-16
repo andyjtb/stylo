@@ -69,6 +69,13 @@ mod ffi {
         pub error_message: String,
     }
 
+    /// Parsed color as nscolor (uint32 RGBA)
+    pub struct ParsedNsColor {
+        pub success: bool,
+        pub nscolor: u32,  // RGBA as uint32 (compatible with nscolor, Qt QRgb, etc.)
+        pub error_message: String,
+    }
+
     extern "Rust" {
         /// Parse a CSS stylesheet from a string
         fn parse_stylesheet(css: &str, base_url: &str) -> ParseResult;
@@ -91,6 +98,10 @@ mod ffi {
 
         /// Parse a CSS color value - returns structured color data
         fn parse_color(color_str: &str) -> ParsedColor;
+
+        /// Parse a CSS color value and convert to nscolor (uint32 RGBA)
+        /// This is compatible with Mozilla's nscolor, Qt's QRgb, and other RGBA uint32 formats
+        fn parse_color_to_nscolor(color_str: &str) -> ParsedNsColor;
     }
 }
 
@@ -323,6 +334,29 @@ mod tests {
         let result = parse_color("rgb(255, 0, 0)");
         assert!(result.success, "Should parse rgb color");
     }
+
+    #[test]
+    fn test_parse_color_to_nscolor() {
+        let result = parse_color_to_nscolor("rgb(255, 0, 0)");
+        assert!(result.success, "Should parse color to nscolor");
+        // RGB(255, 0, 0) with full alpha should be 0xFF0000FF in RGBA format
+        assert_eq!(result.nscolor, 0xFF0000FF);
+    }
+
+    #[test]
+    fn test_parse_color_to_nscolor_with_alpha() {
+        let result = parse_color_to_nscolor("rgba(255, 0, 0, 0.5)");
+        assert!(result.success, "Should parse rgba color to nscolor");
+        // RGBA(255, 0, 0, 128) - alpha 0.5 = 128
+        assert_eq!(result.nscolor, 0xFF000080);
+    }
+
+    #[test]
+    fn test_parse_color_to_nscolor_named() {
+        let result = parse_color_to_nscolor("red");
+        assert!(result.success, "Should parse named color to nscolor");
+        assert_eq!(result.nscolor, 0xFF0000FF);
+    }
 }
 
 /// Parse and validate a media query
@@ -464,6 +498,83 @@ pub fn parse_color(color_str: &str) -> ffi::ParsedColor {
             components: ffi::ColorComponents { c0: 0.0, c1: 0.0, c2: 0.0 },
             alpha: 0.0,
             color_space: ffi::ColorSpace::Srgb,
+            error_message: format!("Failed to parse color: {:?}", e),
+        },
+    }
+}
+
+/// Parse a CSS color value and convert to nscolor (uint32 RGBA)
+/// This converts the color to sRGB and packs it as RGBA bytes in a uint32
+/// Compatible with Mozilla's nscolor, Qt's QRgb, and other RGBA uint32 formats
+pub fn parse_color_to_nscolor(color_str: &str) -> ffi::ParsedNsColor {
+    use crate::properties::longhands::color;
+    use cssparser::{Parser, ParserInput};
+    use std::borrow::Cow;
+
+    // Create a dummy URL for the parser context
+    let url = url::Url::parse("http://example.com").unwrap();
+    let url_data = UrlExtraData::from(url);
+
+    // Create a parser context
+    let context = ParserContext::new(
+        Origin::Author,
+        &url_data,
+        None, // rule_type is optional
+        ParsingMode::DEFAULT,
+        QuirksMode::NoQuirks,
+        Cow::Owned(crate::stylesheets::Namespaces::default()),
+        None, // error_reporter
+        None, // use_counters
+    );
+
+    // Create a parser
+    let mut input = ParserInput::new(color_str);
+    let mut parser = Parser::new(&mut input);
+
+    // Parse the color
+    match color::parse(&context, &mut parser) {
+        Ok(color_value) => {
+            // Extract the color from ColorPropertyValue
+            use crate::values::specified::color::Color;
+            
+            let absolute_color = match color_value.0 {
+                Color::Absolute(abs) => abs.color,
+                Color::CurrentColor => {
+                    return ffi::ParsedNsColor {
+                        success: false,
+                        nscolor: 0,
+                        error_message: "CurrentColor cannot be converted to absolute color".to_string(),
+                    };
+                },
+                _ => {
+                    return ffi::ParsedNsColor {
+                        success: false,
+                        nscolor: 0,
+                        error_message: "Color cannot be resolved to absolute color at parse time".to_string(),
+                    };
+                },
+            };
+
+            // Convert to sRGB color space (same as Gecko's convert_absolute_color_to_nscolor)
+            let srgb = absolute_color.to_color_space(crate::color::ColorSpace::Srgb);
+            
+            // Pack as RGBA uint32 (little-endian byte order: R, G, B, A)
+            let nscolor = u32::from_le_bytes([
+                (srgb.components.0 * 255.0).round() as u8,
+                (srgb.components.1 * 255.0).round() as u8,
+                (srgb.components.2 * 255.0).round() as u8,
+                (srgb.alpha * 255.0).round() as u8,
+            ]);
+
+            ffi::ParsedNsColor {
+                success: true,
+                nscolor,
+                error_message: String::new(),
+            }
+        },
+        Err(e) => ffi::ParsedNsColor {
+            success: false,
+            nscolor: 0,
             error_message: format!("Failed to parse color: {:?}", e),
         },
     }

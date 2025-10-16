@@ -80,7 +80,9 @@ if (computed.success) {
 ```
 
 ### 6. Color Parsing
-Parse CSS color values with structured output:
+Parse CSS color values with structured output or as nscolor (uint32):
+
+#### Structured Color Output
 ```rust
 parse_color(color_str: &str) -> ParsedColor
 ```
@@ -102,6 +104,31 @@ Returns a structured `ParsedColor` with:
 - `color_space`: Enum indicating the color space (Srgb, Hsl, Lab, etc.)
 - `success`: Whether parsing succeeded
 - `error_message`: Error details if parsing failed
+
+#### nscolor (uint32 RGBA) Output
+```rust
+parse_color_to_nscolor(color_str: &str) -> ParsedNsColor
+```
+
+Example:
+```cpp
+auto color = parse_color_to_nscolor("rgb(255, 0, 0)");
+if (color.success) {
+    uint32_t nscolor = color.nscolor;  // 0xFF0000FF (RGBA)
+    // Extract components
+    uint8_t r = nscolor & 0xFF;
+    uint8_t g = (nscolor >> 8) & 0xFF;
+    uint8_t b = (nscolor >> 16) & 0xFF;
+    uint8_t a = (nscolor >> 24) & 0xFF;
+}
+```
+
+The `nscolor` format (little-endian RGBA uint32) is compatible with:
+- Mozilla's nscolor
+- Qt's QRgb  
+- Other RGBA uint32 color formats
+
+**Use this for easy GUI framework integration!** All colors are automatically converted to sRGB.
 
 Supports all CSS color formats:
 - Named colors: `red`, `blue`, `transparent`
@@ -140,6 +167,23 @@ struct ParsedColor {
     error_message: String,
 }
 ```
+
+### ParsedNsColor
+```rust
+struct ParsedNsColor {
+    success: bool,
+    nscolor: u32,           // RGBA as uint32 (little-endian)
+    error_message: String,
+}
+```
+
+The `nscolor` field contains RGBA bytes packed as:
+- Byte 0 (bits 0-7): Red (0-255)
+- Byte 1 (bits 8-15): Green (0-255)
+- Byte 2 (bits 16-23): Blue (0-255)
+- Byte 3 (bits 24-31): Alpha (0-255)
+
+Compatible with Mozilla nscolor, Qt QRgb, and other RGBA uint32 formats.
 
 ### CalcResult
 ```rust

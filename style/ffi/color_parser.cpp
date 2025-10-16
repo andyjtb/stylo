@@ -34,6 +34,20 @@ const char* get_color_space_name(ColorSpace cs) {
     }
 }
 
+// Helper function to extract RGBA from nscolor uint32
+struct RGBA {
+    uint8_t r, g, b, a;
+};
+
+RGBA nscolor_to_rgba(uint32_t nscolor) {
+    return {
+        static_cast<uint8_t>(nscolor & 0xFF),
+        static_cast<uint8_t>((nscolor >> 8) & 0xFF),
+        static_cast<uint8_t>((nscolor >> 16) & 0xFF),
+        static_cast<uint8_t>((nscolor >> 24) & 0xFF)
+    };
+}
+
 // Helper function to print color components with appropriate labels
 void print_color_components(const ParsedColor& color) {
     const char* space_name = get_color_space_name(color.color_space);
@@ -57,14 +71,29 @@ int main() {
     std::cout << "Parsing color: " << color_str << std::endl;
     std::cout << std::endl;
     
-    // Parse the color
+    // Parse the color - structured components
     auto result = parse_color(color_str);
     
     if (result.success) {
-        std::cout << "✓ Successfully parsed color!" << std::endl;
+        std::cout << "✓ Successfully parsed color (structured)!" << std::endl;
         print_color_components(result);
     } else {
         std::cout << "✗ Failed to parse color: " << std::string(result.error_message) << std::endl;
+    }
+    std::cout << std::endl;
+    
+    // Parse the color as nscolor (uint32 RGBA)
+    auto nscolor_result = parse_color_to_nscolor(color_str);
+    
+    if (nscolor_result.success) {
+        auto rgba = nscolor_to_rgba(nscolor_result.nscolor);
+        std::cout << "✓ Successfully parsed color (nscolor)!" << std::endl;
+        std::cout << "  nscolor: 0x" << std::hex << std::setw(8) << std::setfill('0') 
+                  << nscolor_result.nscolor << std::dec << std::endl;
+        std::cout << "  RGBA: (" << static_cast<int>(rgba.r) << ", " 
+                  << static_cast<int>(rgba.g) << ", " 
+                  << static_cast<int>(rgba.b) << ", " 
+                  << static_cast<int>(rgba.a) << ")" << std::endl;
     }
     std::cout << std::endl;
     
@@ -74,58 +103,69 @@ int main() {
     
     // Example 1: Named color
     std::cout << "1. Named color (red):" << std::endl;
-    auto red_result = parse_color("red");
-    if (red_result.success) {
-        print_color_components(red_result);
+    auto red_nscolor = parse_color_to_nscolor("red");
+    if (red_nscolor.success) {
+        auto rgba = nscolor_to_rgba(red_nscolor.nscolor);
+        std::cout << "  nscolor: 0x" << std::hex << std::setw(8) << std::setfill('0') 
+                  << red_nscolor.nscolor << std::dec << std::endl;
+        std::cout << "  RGBA: (" << static_cast<int>(rgba.r) << ", " 
+                  << static_cast<int>(rgba.g) << ", " 
+                  << static_cast<int>(rgba.b) << ", " 
+                  << static_cast<int>(rgba.a) << ")" << std::endl;
     }
     std::cout << std::endl;
     
     // Example 2: Hex color
-    std::cout << "2. Hex color (#ff0000):" << std::endl;
-    auto hex_result = parse_color("#ff0000");
-    if (hex_result.success) {
-        print_color_components(hex_result);
+    std::cout << "2. Hex color (#00ff00):" << std::endl;
+    auto hex_nscolor = parse_color_to_nscolor("#00ff00");
+    if (hex_nscolor.success) {
+        auto rgba = nscolor_to_rgba(hex_nscolor.nscolor);
+        std::cout << "  nscolor: 0x" << std::hex << std::setw(8) << std::setfill('0') 
+                  << hex_nscolor.nscolor << std::dec << std::endl;
+        std::cout << "  RGBA: (" << static_cast<int>(rgba.r) << ", " 
+                  << static_cast<int>(rgba.g) << ", " 
+                  << static_cast<int>(rgba.b) << ", " 
+                  << static_cast<int>(rgba.a) << ")" << std::endl;
     }
     std::cout << std::endl;
     
-    // Example 3: RGB color
-    std::cout << "3. RGB color (rgb(255, 0, 0)):" << std::endl;
-    auto rgb_result = parse_color("rgb(255, 0, 0)");
-    if (rgb_result.success) {
-        print_color_components(rgb_result);
+    // Example 3: RGBA color with alpha
+    std::cout << "3. RGBA color (rgba(0, 128, 255, 0.5)):" << std::endl;
+    auto rgba_nscolor = parse_color_to_nscolor("rgba(0, 128, 255, 0.5)");
+    if (rgba_nscolor.success) {
+        auto rgba = nscolor_to_rgba(rgba_nscolor.nscolor);
+        std::cout << "  nscolor: 0x" << std::hex << std::setw(8) << std::setfill('0') 
+                  << rgba_nscolor.nscolor << std::dec << std::endl;
+        std::cout << "  RGBA: (" << static_cast<int>(rgba.r) << ", " 
+                  << static_cast<int>(rgba.g) << ", " 
+                  << static_cast<int>(rgba.b) << ", " 
+                  << static_cast<int>(rgba.a) << ")" << std::endl;
+        std::cout << "  Note: Alpha 0.5 = " << static_cast<int>(rgba.a) << "/255" << std::endl;
     }
     std::cout << std::endl;
     
-    // Example 4: RGBA color
-    std::cout << "4. RGBA color (rgba(0, 128, 255, 0.5)):" << std::endl;
-    auto rgba_result = parse_color("rgba(0, 128, 255, 0.5)");
-    if (rgba_result.success) {
-        print_color_components(rgba_result);
+    // Example 4: HSL color (converts to sRGB)
+    std::cout << "4. HSL color (hsl(120, 100%, 50%)) - auto-converted to sRGB:" << std::endl;
+    auto hsl_nscolor = parse_color_to_nscolor("hsl(120, 100%, 50%)");
+    if (hsl_nscolor.success) {
+        auto rgba = nscolor_to_rgba(hsl_nscolor.nscolor);
+        std::cout << "  nscolor: 0x" << std::hex << std::setw(8) << std::setfill('0') 
+                  << hsl_nscolor.nscolor << std::dec << std::endl;
+        std::cout << "  RGBA: (" << static_cast<int>(rgba.r) << ", " 
+                  << static_cast<int>(rgba.g) << ", " 
+                  << static_cast<int>(rgba.b) << ", " 
+                  << static_cast<int>(rgba.a) << ")" << std::endl;
     }
     std::cout << std::endl;
     
-    // Example 5: HSL color
-    std::cout << "5. HSL color (hsl(120, 100%, 50%)):" << std::endl;
-    auto hsl_result = parse_color("hsl(120, 100%, 50%)");
-    if (hsl_result.success) {
-        print_color_components(hsl_result);
-    }
+    std::cout << "=== nscolor Format ===" << std::endl;
+    std::cout << "The nscolor uint32 format (little-endian RGBA) is compatible with:" << std::endl;
+    std::cout << "  - Mozilla nscolor" << std::endl;
+    std::cout << "  - Qt QRgb" << std::endl;
+    std::cout << "  - Other RGBA uint32 formats" << std::endl;
     std::cout << std::endl;
     
-    // Example 6: Lab color
-    std::cout << "6. Lab color (lab(50% 20 30)):" << std::endl;
-    auto lab_result = parse_color("lab(50% 20 30)");
-    if (lab_result.success) {
-        print_color_components(lab_result);
-    }
-    std::cout << std::endl;
-    
-    // Example 7: Invalid color
-    std::cout << "7. Invalid color (notacolor):" << std::endl;
-    auto invalid_result = parse_color("notacolor");
-    if (!invalid_result.success) {
-        std::cout << "  ✓ Correctly rejected: " << std::string(invalid_result.error_message) << std::endl;
-    }
+    std::cout << "Use parse_color_to_nscolor() for easy integration with GUI frameworks!" << std::endl;
     std::cout << std::endl;
     
     std::cout << "=== Example Complete ===" << std::endl;
