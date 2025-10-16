@@ -144,10 +144,14 @@ if (result.success) {
     // Stylesheet parsed successfully
 }
 
-// Parse a color
+// Parse a color - returns structured data
 auto color = parse_color("hsla(-300, 100%, 37.5%, -3)");
 if (color.success) {
-    std::cout << "Parsed: " << color.value << std::endl;
+    // Access color components directly
+    std::cout << "Color space: " << color.color_space << std::endl;
+    std::cout << "RGB/HSL components: " << color.components.c0 << ", " 
+              << color.components.c1 << ", " << color.components.c2 << std::endl;
+    std::cout << "Alpha: " << color.alpha << std::endl;
 }
 ```
 

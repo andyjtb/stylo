@@ -34,6 +34,41 @@ mod ffi {
         pub success: bool,
     }
 
+    /// Color space enum for CSS colors
+    #[repr(u8)]
+    pub enum ColorSpace {
+        Srgb = 0,
+        Hsl,
+        Hwb,
+        Lab,
+        Lch,
+        Oklab,
+        Oklch,
+        SrgbLinear,
+        DisplayP3,
+        A98Rgb,
+        ProphotoRgb,
+        Rec2020,
+        XyzD50,
+        XyzD65,
+    }
+
+    /// Color components (r, g, b) or (h, s, l) etc.
+    pub struct ColorComponents {
+        pub c0: f32,
+        pub c1: f32,
+        pub c2: f32,
+    }
+
+    /// Parsed absolute color with components
+    pub struct ParsedColor {
+        pub success: bool,
+        pub components: ColorComponents,
+        pub alpha: f32,
+        pub color_space: ColorSpace,
+        pub error_message: String,
+    }
+
     extern "Rust" {
         /// Parse a CSS stylesheet from a string
         fn parse_stylesheet(css: &str, base_url: &str) -> ParseResult;
@@ -54,8 +89,8 @@ mod ffi {
             base_font_size: f32,
         ) -> ParsedCSSValue;
 
-        /// Parse a CSS color value
-        fn parse_color(color_str: &str) -> ParsedCSSValue;
+        /// Parse a CSS color value - returns structured color data
+        fn parse_color(color_str: &str) -> ParsedColor;
     }
 }
 
@@ -339,7 +374,7 @@ pub fn get_computed_value(
 }
 
 /// Parse a CSS color value
-pub fn parse_color(color_str: &str) -> ffi::ParsedCSSValue {
+pub fn parse_color(color_str: &str) -> ffi::ParsedColor {
     use crate::properties::longhands::color;
     use cssparser::{Parser, ParserInput};
     use std::borrow::Cow;
@@ -366,13 +401,70 @@ pub fn parse_color(color_str: &str) -> ffi::ParsedCSSValue {
 
     // Parse the color
     match color::parse(&context, &mut parser) {
-        Ok(color) => ffi::ParsedCSSValue {
-            value: format!("{:?}", color),
-            success: true,
+        Ok(color_value) => {
+            // Extract the color from ColorPropertyValue
+            use crate::values::specified::color::Color;
+            
+            let absolute_color = match color_value.0 {
+                Color::Absolute(abs) => abs.color,
+                Color::CurrentColor => {
+                    // CurrentColor doesn't have absolute values, return error
+                    return ffi::ParsedColor {
+                        success: false,
+                        components: ffi::ColorComponents { c0: 0.0, c1: 0.0, c2: 0.0 },
+                        alpha: 0.0,
+                        color_space: ffi::ColorSpace::Srgb,
+                        error_message: "CurrentColor cannot be converted to absolute color".to_string(),
+                    };
+                },
+                _ => {
+                    // Other color types (ColorFunction, ColorMix, etc.) can't be resolved at parse time
+                    return ffi::ParsedColor {
+                        success: false,
+                        components: ffi::ColorComponents { c0: 0.0, c1: 0.0, c2: 0.0 },
+                        alpha: 0.0,
+                        color_space: ffi::ColorSpace::Srgb,
+                        error_message: "Color cannot be resolved to absolute color at parse time".to_string(),
+                    };
+                },
+            };
+
+            // Convert ColorSpace to FFI ColorSpace
+            let color_space = match absolute_color.color_space {
+                crate::color::ColorSpace::Srgb => ffi::ColorSpace::Srgb,
+                crate::color::ColorSpace::Hsl => ffi::ColorSpace::Hsl,
+                crate::color::ColorSpace::Hwb => ffi::ColorSpace::Hwb,
+                crate::color::ColorSpace::Lab => ffi::ColorSpace::Lab,
+                crate::color::ColorSpace::Lch => ffi::ColorSpace::Lch,
+                crate::color::ColorSpace::Oklab => ffi::ColorSpace::Oklab,
+                crate::color::ColorSpace::Oklch => ffi::ColorSpace::Oklch,
+                crate::color::ColorSpace::SrgbLinear => ffi::ColorSpace::SrgbLinear,
+                crate::color::ColorSpace::DisplayP3 => ffi::ColorSpace::DisplayP3,
+                crate::color::ColorSpace::A98Rgb => ffi::ColorSpace::A98Rgb,
+                crate::color::ColorSpace::ProphotoRgb => ffi::ColorSpace::ProphotoRgb,
+                crate::color::ColorSpace::Rec2020 => ffi::ColorSpace::Rec2020,
+                crate::color::ColorSpace::XyzD50 => ffi::ColorSpace::XyzD50,
+                crate::color::ColorSpace::XyzD65 => ffi::ColorSpace::XyzD65,
+            };
+
+            ffi::ParsedColor {
+                success: true,
+                components: ffi::ColorComponents {
+                    c0: absolute_color.components.0,
+                    c1: absolute_color.components.1,
+                    c2: absolute_color.components.2,
+                },
+                alpha: absolute_color.alpha,
+                color_space,
+                error_message: String::new(),
+            }
         },
-        Err(e) => ffi::ParsedCSSValue {
-            value: format!("Failed to parse color: {:?}", e),
+        Err(e) => ffi::ParsedColor {
             success: false,
+            components: ffi::ColorComponents { c0: 0.0, c1: 0.0, c2: 0.0 },
+            alpha: 0.0,
+            color_space: ffi::ColorSpace::Srgb,
+            error_message: format!("Failed to parse color: {:?}", e),
         },
     }
 }

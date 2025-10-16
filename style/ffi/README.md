@@ -80,24 +80,37 @@ if (computed.success) {
 ```
 
 ### 6. Color Parsing
-Parse CSS color values:
+Parse CSS color values with structured output:
 ```rust
-parse_color(color_str: &str) -> ParsedCSSValue
+parse_color(color_str: &str) -> ParsedColor
 ```
 
 Example:
 ```cpp
 auto color = parse_color("hsla(-300, 100%, 37.5%, -3)");
 if (color.success) {
-    std::cout << "Parsed color: " << color.value << std::endl;
+    std::cout << "Color Space: " << color.color_space << std::endl;
+    std::cout << "Components: (" << color.components.c0 << ", " 
+              << color.components.c1 << ", " << color.components.c2 << ")" << std::endl;
+    std::cout << "Alpha: " << color.alpha << std::endl;
 }
 ```
+
+Returns a structured `ParsedColor` with:
+- `components`: Color components (3 floats) - interpretation depends on color space
+- `alpha`: Alpha channel (0.0 to 1.0)
+- `color_space`: Enum indicating the color space (Srgb, Hsl, Lab, etc.)
+- `success`: Whether parsing succeeded
+- `error_message`: Error details if parsing failed
 
 Supports all CSS color formats:
 - Named colors: `red`, `blue`, `transparent`
 - Hex colors: `#ff0000`, `#f00`
 - RGB/RGBA: `rgb(255, 0, 0)`, `rgba(0, 128, 255, 0.5)`
 - HSL/HSLA: `hsl(120, 100%, 50%)`, `hsla(-300, 100%, 37.5%, -3)`
+- Lab/Lch: `lab(50% 20 30)`, `lch(50% 40 180)`
+- Oklab/Oklch: `oklab(0.5 0.1 0.1)`, `oklch(0.5 0.2 180)`
+- And more color spaces (Display P3, Rec2020, XYZ, etc.)
 
 ## Types
 
@@ -114,6 +127,17 @@ struct ParseResult {
 struct ParsedCSSValue {
     value: String,
     success: bool,
+}
+```
+
+### ParsedColor
+```rust
+struct ParsedColor {
+    success: bool,
+    components: ColorComponents,  // 3 floats: c0, c1, c2
+    alpha: f32,
+    color_space: ColorSpace,      // Enum: Srgb, Hsl, Lab, etc.
+    error_message: String,
 }
 ```
 
