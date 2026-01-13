@@ -1,0 +1,3 @@
+[submodule "html5ever"]
+	path = html5ever
+	url = git@github.com:andyjtb/html5ever.git

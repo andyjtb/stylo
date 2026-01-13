@@ -2956,7 +2956,7 @@ macro_rules! longhand_properties_idents {
 #[cfg(feature = "gecko")]
 size_of_test!(ComputedValues, 248);
 #[cfg(feature = "servo")]
-size_of_test!(ComputedValues, 216);
+size_of_test!(ComputedValues, 232);  // +16 bytes for UILayouts and InheritedUILayouts style structs
 
 // FFI relies on this.
 size_of_test!(Option<Arc<ComputedValues>>, 8);

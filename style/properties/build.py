@@ -21,6 +21,8 @@ import data
 RE_PYTHON_ADDR = re.compile(r"<.+? object at 0x[0-9a-fA-F]+>")
 
 OUT_DIR = os.environ.get("OUT_DIR", "")
+# Optional separate output directory for C++ files (for CMake integration)
+CPP_OUTPUT_DIR = os.environ.get("STYLO_CPP_OUTPUT_DIR", OUT_DIR)
 
 
 def main():
@@ -78,6 +80,18 @@ def main():
             write(doc_servo, "css-properties.json", as_json)
             write(OUT_DIR, "css-properties.json", as_json)
             write(OUT_DIR, "css-properties.html", as_html)
+
+            # Generate C++ property files for UILayouts
+            cpp_header = render(
+                os.path.join(BASE, "cpp_properties.mako.h"),
+                data=properties,
+            )
+            cpp_source = render(
+                os.path.join(BASE, "cpp_properties.mako.cpp"),
+                data=properties,
+            )
+            write(CPP_OUTPUT_DIR, "ui_css_properties.h", cpp_header)
+            write(CPP_OUTPUT_DIR, "ui_css_properties.cpp", cpp_source)
     elif output == "geckolib":
         if len(sys.argv) < 4:
             abort(usage)

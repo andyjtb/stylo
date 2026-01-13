@@ -36,3 +36,11 @@ dom             = { version = "0.10.0", path = "./stylo_dom", package = "stylo_d
 style_traits    = { version = "0.10.0", path = "./style_traits", features = ["servo"], package = "stylo_traits"}
 style_derive    = { version = "0.10.0", path = "./style_derive", package = "stylo_derive"}
 stylo           = { version = "0.10.0", path = "./style" }
+
+# Use custom html5ever submodule with C++ enum generation for web atoms
+[patch.crates-io]
+web_atoms = { path = "../html5ever/web_atoms" }
+markup5ever = { path = "../html5ever/markup5ever" }
+html5ever = { path = "../html5ever/html5ever" }
+xml5ever = { path = "../html5ever/xml5ever" }
+tendril = { path = "../html5ever/tendril" }

@@ -88,6 +88,14 @@ fn main() {
     };
     println!("cargo:rerun-if-changed=build.rs");
     println!("cargo:out_dir={}", env::var("OUT_DIR").unwrap());
+
+    // Rerun if local_names.txt changes (affects CSS property generation)
+    let local_names_path = Path::new(&env::var_os("CARGO_MANIFEST_DIR").unwrap())
+        .parent()
+        .unwrap()
+        .join("html5ever/web_atoms/local_names.txt");
+    println!("cargo:rerun-if-changed={}", local_names_path.display());
+
     generate_properties(engine);
     build_gecko::generate();
 }
