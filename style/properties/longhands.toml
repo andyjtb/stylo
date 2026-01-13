@@ -3660,7 +3660,6 @@ gecko_constant_prefix = "NS_FONT_VARIANT_CAPS"
 
 [font-kerning]
 struct = "font"
-engine = "gecko"
 spec = "https://drafts.csswg.org/css-fonts/#propdef-font-kerning"
 animation_type = "discrete"
 affects = "layout"
@@ -4142,3 +4141,120 @@ animation_type = "none"
 gecko_pref = "layout.css.scroll-driven-animations.enabled"
 spec = "https://drafts.csswg.org/scroll-animations-1/#timeline-scope"
 affects = ""
+
+# UILayouts style struct (non-inherited, servo-only)
+
+[shadow-color]
+type = "Color"
+initial = "computed::Color::TRANSPARENT_BLACK"
+initial_specified_value = "specified::Color::transparent()"
+struct = "uilayouts"
+engine = "servo"
+ignored_when_colors_disabled = true
+spec = "nonstandard"
+affects = "paint"
+
+[shadow-offset-x]
+type = "Length"
+initial = "computed::Length::zero()"
+struct = "uilayouts"
+engine = "servo"
+spec = "nonstandard"
+affects = "paint"
+
+[shadow-offset-y]
+type = "Length"
+initial = "computed::Length::zero()"
+struct = "uilayouts"
+engine = "servo"
+spec = "nonstandard"
+affects = "paint"
+
+[shadow-radius]
+type = "NonNegativeLengthPercentage"
+initial = "computed::NonNegativeLengthPercentage::zero()"
+struct = "uilayouts"
+engine = "servo"
+spec = "nonstandard"
+affects = "paint"
+
+[shadow-type]
+struct = "uilayouts"
+engine = "servo"
+animation_type = "discrete"
+spec = "nonstandard"
+affects = "paint"
+keyword = { values = ["normal", "none", "inset"] }
+
+# InheritedUILayouts style struct (inherited, servo-only)
+
+[highlight-color]
+type = "ColorOrAuto"
+initial = "generics::color::ColorOrAuto::Auto"
+struct = "inherited_uilayouts"
+engine = "servo"
+ignored_when_colors_disabled = true
+spec = "nonstandard"
+affects = "paint"
+
+[highlight-text-color]
+type = "ColorOrAuto"
+initial = "generics::color::ColorOrAuto::Auto"
+struct = "inherited_uilayouts"
+engine = "servo"
+ignored_when_colors_disabled = true
+spec = "nonstandard"
+affects = "paint"
+
+[placeholder-color]
+type = "ColorOrAuto"
+initial = "generics::color::ColorOrAuto::Auto"
+struct = "inherited_uilayouts"
+engine = "servo"
+ignored_when_colors_disabled = true
+spec = "nonstandard"
+affects = "paint"
+
+[font-height]
+type = "NonNegativeLength"
+initial = "computed::NonNegativeLength::new(13.0)"
+struct = "inherited_uilayouts"
+engine = "servo"
+spec = "nonstandard"
+affects = "layout"
+
+[ui-font-kerning]
+type = "NonNegativeLength"
+initial = "computed::NonNegativeLength::zero()"
+struct = "inherited_uilayouts"
+engine = "servo"
+spec = "nonstandard"
+affects = "layout"
+
+[src]
+type = "Image"
+initial = "computed::Image::None"
+initial_specified_value = "specified::Image::None"
+struct = "inherited_uilayouts"
+engine = "servo"
+animation_type = "discrete"
+spec = "nonstandard"
+affects = "paint"
+
+[scrollbar-thumb-color]
+type = "ColorOrAuto"
+initial = "generics::color::ColorOrAuto::Auto"
+struct = "inherited_uilayouts"
+engine = "servo"
+ignored_when_colors_disabled = true
+spec = "nonstandard"
+affects = "paint"
+
+[scrollbar-track-color]
+type = "ColorOrAuto"
+initial = "generics::color::ColorOrAuto::Auto"
+struct = "inherited_uilayouts"
+engine = "servo"
+ignored_when_colors_disabled = true
+spec = "nonstandard"
+affects = "paint"

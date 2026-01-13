@@ -857,6 +857,9 @@ class PropertiesData(object):
             StyleStruct("Text", inherited=False, gecko_name="TextReset"),
             StyleStruct("UI", inherited=False, gecko_name="UIReset"),
             StyleStruct("XUL", inherited=False),
+            # UILayouts custom properties
+            StyleStruct("UILayouts", inherited=False),
+            StyleStruct("InheritedUILayouts", inherited=True),
         ]
 
         longhands_toml = toml.loads(open(os.path.join(os.path.dirname(__file__), "longhands.toml")).read())
