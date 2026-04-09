@@ -12,10 +12,7 @@ use crate::computed_values::mix_blend_mode::T as MixBlendMode;
 use crate::computed_values::transform_style::T as TransformStyle;
 use crate::dom::TElement;
 use crate::matching::{StyleChange, StyleDifference};
-use crate::properties::{
-    restyle_damage_rebuild_box, restyle_damage_rebuild_stacking_context,
-    restyle_damage_recalculate_overflow, restyle_damage_repaint, style_structs, ComputedValues,
-};
+use crate::properties::{style_structs, ComputedValues, LonghandIdSet};
 use crate::values::computed::basic_shape::ClipPath;
 use crate::values::computed::Perspective;
 use crate::values::generics::transform::{GenericRotate, GenericScale, GenericTranslate};
@@ -59,10 +56,12 @@ impl ServoRestyleDamage {
         old: &ComputedValues,
         new: &ComputedValues,
     ) -> StyleDifference {
+        let mut changed_longhands = LonghandIdSet::new();
         let mut damage = if std::ptr::eq(old, new) {
             ServoRestyleDamage::empty()
         } else {
-            compute_damage(old, new)
+            let base = old.compute_change_set(new, &mut changed_longhands);
+            augment_damage(old, new, base)
         };
         let custom_properties_changed = !old.custom_properties_equal(new);
 
@@ -82,7 +81,11 @@ impl ServoRestyleDamage {
             }
         };
 
-        StyleDifference { damage, change }
+        StyleDifference {
+            damage,
+            change,
+            changed_longhands,
+        }
     }
 
     /// Returns a bitmask indicating that the frame needs to be reconstructed.
@@ -134,39 +137,44 @@ impl fmt::Display for ServoRestyleDamage {
     }
 }
 
-fn augmented_restyle_damage_rebuild_box(old: &ComputedValues, new: &ComputedValues) -> bool {
-    let old_box = old.get_box();
-    let new_box = new.get_box();
-    restyle_damage_rebuild_box(old, new)
-        || old_box.original_display != new_box.original_display
-        || old_box.has_transform_or_perspective() != new_box.has_transform_or_perspective()
-        || old.get_effects().filter.0.is_empty() != new.get_effects().filter.0.is_empty()
-}
-
-fn augmented_restyle_damage_rebuild_stacking_context(
+/// Apply the augmentation rules that don't map 1:1 to any single longhand
+/// comparison. `base` is the damage that `ComputedValues::compute_change_set`
+/// produced from walking every non-logical longhand.
+///
+/// - `original_display` is a derived field on `style_structs::Box`, not a
+///   longhand, so it must be compared directly.
+/// - `has_transform_or_perspective()` is a boolean over several longhands;
+///   flipping it (e.g. transform going from `none` to `translate(5px)`) is
+///   what triggers layout, not the individual longhand change.
+/// - Filter list going from empty ↔ non-empty likewise changes the frame
+///   construction in a way the per-longhand walk doesn't capture.
+/// - `guarantees_stacking_context()` flipping requires rebuilding stacking
+///   contexts, independent of any single longhand diff.
+/// - Custom-property changes force a REPAINT for paint worklets.
+fn augment_damage(
     old: &ComputedValues,
     new: &ComputedValues,
-) -> bool {
-    restyle_damage_rebuild_stacking_context(old, new)
-        || old.guarantees_stacking_context() != new.guarantees_stacking_context()
-}
-fn compute_damage(old: &ComputedValues, new: &ComputedValues) -> ServoRestyleDamage {
-    let mut damage = ServoRestyleDamage::empty();
+    base: ServoRestyleDamage,
+) -> ServoRestyleDamage {
+    let mut damage = base;
 
-    // Damage flags higher up the if-else chain imply damage flags lower down the if-else chain,
-    // so we can skip the diffing process for later flags if an earlier flag is true
-    if augmented_restyle_damage_rebuild_box(old, new) {
-        damage.insert(ServoRestyleDamage::RELAYOUT)
-    } else if restyle_damage_recalculate_overflow(old, new) {
-        damage.insert(ServoRestyleDamage::RECALCULATE_OVERFLOW)
-    } else if augmented_restyle_damage_rebuild_stacking_context(old, new) {
-        damage.insert(ServoRestyleDamage::REBUILD_STACKING_CONTEXT);
-    } else if restyle_damage_repaint(old, new) {
-        damage.insert(ServoRestyleDamage::REPAINT);
+    let old_box = old.get_box();
+    let new_box = new.get_box();
+    if old_box.original_display != new_box.original_display
+        || old_box.has_transform_or_perspective() != new_box.has_transform_or_perspective()
+        || old.get_effects().filter.0.is_empty() != new.get_effects().filter.0.is_empty()
+    {
+        damage |= ServoRestyleDamage::RELAYOUT;
     }
-    // Paint worklets may depend on custom properties, so if they have changed we should repaint.
-    else if !old.custom_properties_equal(new) {
-        damage.insert(ServoRestyleDamage::REPAINT);
+
+    if old.guarantees_stacking_context() != new.guarantees_stacking_context() {
+        damage |= ServoRestyleDamage::REBUILD_STACKING_CONTEXT;
+    }
+
+    // Paint worklets may depend on custom properties, so if they have
+    // changed we should repaint.
+    if !old.custom_properties_equal(new) {
+        damage |= ServoRestyleDamage::REPAINT;
     }
 
     damage

@@ -1220,6 +1220,7 @@ impl NonCustomPropertyIdSet {
 
 /// A set of longhand properties
 #[derive(Clone, Copy, Debug, Default, MallocSizeOf, PartialEq)]
+#[repr(C)]
 pub struct LonghandIdSet {
     storage: [u32; ((property_counts::LONGHANDS as usize) - 1 + 32) / 32],
 }

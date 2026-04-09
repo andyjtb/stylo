@@ -19,6 +19,7 @@ use crate::dom::TNode;
 use crate::invalidation::element::restyle_hints::RestyleHint;
 use crate::properties::longhands::display::computed_value::T as Display;
 use crate::properties::ComputedValues;
+use crate::properties::LonghandIdSet;
 use crate::properties::PropertyDeclarationBlock;
 use crate::rule_tree::{CascadeLevel, CascadeOrigin, StrongRuleNode};
 #[cfg(feature = "servo")]
@@ -40,6 +41,12 @@ pub struct StyleDifference {
 
     /// Whether any styles changed.
     pub change: StyleChange,
+
+    /// The precise set of longhand properties whose computed values differ
+    /// between the old and new style. Populated by the servo restyle path;
+    /// the gecko path leaves this empty (gecko tracks per-property changes
+    /// through its own bindings).
+    pub changed_longhands: LonghandIdSet,
 }
 
 /// Represents whether or not the style of an element has changed.

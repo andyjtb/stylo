@@ -424,6 +424,29 @@ class Longhand(Property):
         # See compute_damage for the various values this can take
         self.servo_restyle_damage = servo_restyle_damage
 
+    def servo_restyle_damage_const(self):
+        """Return the ServoRestyleDamage variant(s) a longhand contributes to.
+
+        `servo_restyle_damage` is a space-separated list of damage class names
+        (e.g. "repaint", "rebuild_box"). We map each to its ServoRestyleDamage
+        constant and OR them together. Because the bit patterns nest
+        (RELAYOUT ⊇ RECALCULATE_OVERFLOW ⊇ REBUILD_STACKING_CONTEXT ⊇ REPAINT),
+        the strongest class always dominates via bitwise OR.
+        """
+        classes = self.servo_restyle_damage.split()
+        if not classes:
+            return "ServoRestyleDamage::empty()"
+        mapping = {
+            "rebuild_box": "ServoRestyleDamage::RELAYOUT",
+            "recalculate_overflow": "ServoRestyleDamage::RECALCULATE_OVERFLOW",
+            "rebuild_stacking_context": "ServoRestyleDamage::REBUILD_STACKING_CONTEXT",
+            "repaint": "ServoRestyleDamage::REPAINT",
+        }
+        flags = [mapping[cls] for cls in classes if cls in mapping]
+        if not flags:
+            return "ServoRestyleDamage::empty()"
+        return " | ".join(flags)
+
     def affects_flags(self):
         # Layout is the stronger hint. This property animation affects layout
         # or frame construction. `display` or `width` are examples that should

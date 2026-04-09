@@ -76,7 +76,13 @@ impl GeckoRestyleDamage {
             StyleChange::Unchanged
         };
         let damage = GeckoRestyleDamage(nsChangeHint(hint));
-        StyleDifference { damage, change }
+        StyleDifference {
+            damage,
+            change,
+            // Gecko tracks per-property changes through its own bindings, so
+            // we don't populate changed_longhands here. Left empty.
+            changed_longhands: crate::properties::LonghandIdSet::new(),
+        }
     }
 
     /// Returns true if this restyle damage contains all the damage of |other|.

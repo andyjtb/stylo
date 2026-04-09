@@ -1844,6 +1844,40 @@ impl ComputedValues {
         set
     }
 
+    /// Walk every non-logical longhand once, populating `out` with the set
+    /// of changed longhands and returning the cumulative servo restyle damage.
+    ///
+    /// Replaces the previous four-pass `restyle_damage_*` functions with a
+    /// single walk that produces both the change set and the damage flags.
+    /// The per-style-struct `std::ptr::eq` fast path is preserved.
+    #[cfg(feature = "servo")]
+    pub fn compute_change_set(
+        &self,
+        other: &ComputedValues,
+        out: &mut LonghandIdSet,
+    ) -> crate::servo::restyle_damage::ServoRestyleDamage {
+        use crate::servo::restyle_damage::ServoRestyleDamage;
+        let mut damage = ServoRestyleDamage::empty();
+        % for style_struct in data.active_style_structs():
+        <% has_non_logical = any(not lh.logical for lh in style_struct.longhands) %>
+        % if has_non_logical:
+        let old_${style_struct.name_lower} = self.get_${style_struct.name_lower}();
+        let new_${style_struct.name_lower} = other.get_${style_struct.name_lower}();
+        if !std::ptr::eq(old_${style_struct.name_lower}, new_${style_struct.name_lower}) {
+            % for longhand in style_struct.longhands:
+            % if not longhand.logical:
+            if old_${style_struct.name_lower}.${longhand.ident} != new_${style_struct.name_lower}.${longhand.ident} {
+                out.insert(LonghandId::${longhand.camel_case});
+                damage |= ${longhand.servo_restyle_damage_const()};
+            }
+            % endif
+            % endfor
+        }
+        % endif
+        % endfor
+        damage
+    }
+
     /// Create a `TransitionPropertyIterator` for this styles transition properties.
     pub fn transition_properties<'a>(&'a self) -> TransitionPropertyIterator<'a> {
         TransitionPropertyIterator::from_style(self)
@@ -2907,31 +2941,10 @@ const_assert!(std::mem::size_of::<longhands::${longhand.ident}::SpecifiedValue>(
 % endif
 % endfor
 
-% if engine == "servo":
-% for effect_name in ["repaint", "recalculate_overflow", "rebuild_stacking_context", "rebuild_box"]:
-pub(crate) fn restyle_damage_${effect_name} (old: &ComputedValues, new: &ComputedValues) -> bool {
-    % for style_struct in data.active_style_structs():
-        <% longhands_affected = [effect_name in longhand.servo_restyle_damage.split() for longhand in style_struct.longhands if not longhand.logical] %>
-        % if any(longhands_affected):
-        let old_${style_struct.name_lower} = old.get_${style_struct.name_lower}();
-        let new_${style_struct.name_lower} = new.get_${style_struct.name_lower}();
-        if !std::ptr::eq(old_${style_struct.name_lower}, new_${style_struct.name_lower}) {
-            if
-            % for longhand in style_struct.longhands:
-            % if effect_name in longhand.servo_restyle_damage.split() and not longhand.logical:
-                old_${style_struct.name_lower}.${longhand.ident} != new_${style_struct.name_lower}.${longhand.ident} ||
-            % endif
-            % endfor
-            false {
-                return true;
-            }
-        }
-        % endif
-    % endfor
-    false
-}
-% endfor
-% endif
+// The four `restyle_damage_*` helpers that used to live here have been
+// replaced by `ComputedValues::compute_change_set`, which walks every
+// non-logical longhand once and produces both the LonghandIdSet of changed
+// properties and the cumulative ServoRestyleDamage in a single pass.
 
 /// Descriptor types for @-rules like @font-face and @counter-style.
 <%def name="generate_descriptors(descriptors)">
