@@ -1,5 +1,6 @@
 [workspace]
 resolver = "2"
+exclude = ["html5ever"]
 members = [
     "stylo_atoms",
     "stylo_dom",
@@ -35,10 +36,15 @@ style_traits    = { version = "0.16.0", path = "./style_traits", features = ["se
 style_derive    = { version = "0.16.0", path = "./style_derive", package = "stylo_derive"}
 stylo           = { version = "0.16.0", path = "./style" }
 
-# Use custom html5ever submodule with C++ enum generation for web atoms
+[profile.release]
+opt-level = "z"     # optimise for size
+lto = true          # link-time optimisation removes dead code across crates
+codegen-units = 1   # single codegen unit for maximum optimisation
+panic = "abort"     # remove unwinding code
+strip = true        # strip symbols from the binary
+
+# Use custom html5ever submodule with the extended local_names.txt that
+# stylo's build_cpp_codegen reads. Only web_atoms is pulled into stylo's
+# crate graph, so only that patch is necessary.
 [patch.crates-io]
-web_atoms = { path = "../html5ever/web_atoms" }
-markup5ever = { path = "../html5ever/markup5ever" }
-html5ever = { path = "../html5ever/html5ever" }
-xml5ever = { path = "../html5ever/xml5ever" }
-tendril = { path = "../html5ever/tendril" }
+web_atoms = { path = "./html5ever/web_atoms" }
