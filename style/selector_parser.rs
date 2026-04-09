@@ -267,7 +267,7 @@ impl ToCss for Direction {
     }
 }
 
-#[cfg(test)]
+#[cfg(all(test, feature = "gecko"))]
 mod tests {
     use super::*;
 

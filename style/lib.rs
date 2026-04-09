@@ -51,6 +51,13 @@ extern crate static_assertions;
 #[macro_use]
 mod macros;
 
+#[cfg(test)]
+#[path = "build_cpp_codegen.rs"]
+mod build_cpp_codegen;
+
+#[cfg(feature = "servo")]
+pub mod dom_atoms;
+
 mod derives {
     pub(crate) use derive_more::{Add, AddAssign, Deref, DerefMut, From};
     pub(crate) use malloc_size_of_derive::MallocSizeOf;

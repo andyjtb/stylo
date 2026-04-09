@@ -3,10 +3,12 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 
 use std::env;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::process::{exit, Command};
 use std::sync::LazyLock;
 use walkdir::WalkDir;
+
+mod build_cpp_codegen;
 
 #[cfg(feature = "gecko")]
 mod build_gecko;
@@ -96,4 +98,22 @@ fn main() {
 
     generate_properties(engine);
     build_gecko::generate();
+
+    // Generate C++ headers exposing web_atoms::LocalName static-atom u64 values.
+    // Honors STYLO_CPP_OUTPUT_DIR for CMake integration; otherwise lands in OUT_DIR.
+    let cpp_out = env::var("STYLO_CPP_OUTPUT_DIR")
+        .map(PathBuf::from)
+        .unwrap_or_else(|_| PathBuf::from(env::var("OUT_DIR").unwrap()));
+    std::fs::create_dir_all(&cpp_out).ok();
+    println!("cargo:rerun-if-env-changed=STYLO_CPP_OUTPUT_DIR");
+    build_cpp_codegen::generate_attribute_header(&local_names_path, &cpp_out);
+
+    // ui_css_properties.h is only emitted for the servo engine by build.py;
+    // ui_changed_properties.h depends on it for the PropertyId type and for
+    // the longhand count, so gate it on the same condition.
+    if servo {
+        let css_props_header = cpp_out.join("ui_css_properties.h");
+        let longhand_count = build_cpp_codegen::read_longhand_count(&css_props_header);
+        build_cpp_codegen::generate_changed_properties_header(longhand_count, &cpp_out);
+    }
 }
